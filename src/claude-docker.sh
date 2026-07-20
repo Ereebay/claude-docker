@@ -70,47 +70,57 @@ fi
 CLAUDE_HOME_DIR="$CLAUDE_DOCKER_DIR/claude-home"
 SSH_DIR="$CLAUDE_DOCKER_DIR/ssh"
 
+# Preserve any --cc-version flag value before sourcing .env (.env may also set CC_VERSION)
+CC_VERSION_FLAG="$CC_VERSION"
+
 # Check if .env exists in claude-docker directory for building
 ENV_FILE="$PROJECT_ROOT/.env"
 if [ -f "$ENV_FILE" ]; then
-    echo "✓ Found .env file with credentials"
+    log_ok "已找到环境配置文件:$ENV_FILE"
     # Source .env to get configuration variables
     set -a
     source "$ENV_FILE" 2>/dev/null || true
     set +a
 else
-    echo "⚠️  No .env file found at $ENV_FILE"
-    echo "   Twilio MCP features will be unavailable."
-    echo "   To enable: copy .env.example to .env in the claude-docker repository and add your credentials"
+    log_warn "未找到环境配置文件:$ENV_FILE"
+    log_warn "   Twilio MCP 功能将不可用。"
+    log_warn "   如需启用:在 claude-docker 仓库中将 .env.example 复制为 .env 并填入你的凭证。"
 fi
 
 # Use environment variables as defaults if command line args not provided
 if [ -z "${MEMORY_LIMIT:-}" ] && [ -n "${DOCKER_MEMORY_LIMIT:-}" ]; then
     MEMORY_LIMIT="$DOCKER_MEMORY_LIMIT"
-    echo "✓ Using memory limit from environment: $MEMORY_LIMIT"
+    log_ok "使用环境变量中的内存上限:$MEMORY_LIMIT"
 fi
 
 if [ -z "${GPU_ACCESS:-}" ] && [ -n "${DOCKER_GPU_ACCESS:-}" ]; then
     GPU_ACCESS="$DOCKER_GPU_ACCESS"
-    echo "✓ Using GPU access from environment: $GPU_ACCESS"
+    log_ok "使用环境变量中的 GPU 配置:$GPU_ACCESS"
+fi
+
+# --cc-version flag takes precedence over any CC_VERSION provided via .env
+if [ -n "$CC_VERSION_FLAG" ]; then
+    CC_VERSION="$CC_VERSION_FLAG"
+elif [ -n "${CC_VERSION:-}" ]; then
+    log_ok "使用 .env 中的 Claude Code 版本:$CC_VERSION"
 fi
 
 # Check if we need to rebuild the image
 NEED_REBUILD=false
 
 if ! "$DOCKER" images | grep -q "claude-docker"; then
-    echo "Building Claude Docker image for first time..."
+    log_info "首次构建 Claude Docker 镜像..."
     NEED_REBUILD=true
 fi
 
 if [ "$FORCE_REBUILD" = true ]; then
-    echo "Forcing rebuild of Claude Docker image..."
+    log_info "强制重新构建 Claude Docker 镜像..."
     NEED_REBUILD=true
 fi
 
 # Warn if --no-cache is used without rebuild
 if [ -n "${NO_CACHE:-}" ] && [ "$NEED_REBUILD" = false ]; then
-    echo "⚠️  Warning: --no-cache flag set but image already exists. Use --rebuild --no-cache to force rebuild without cache."
+    log_warn "已设置 --no-cache 但镜像已存在。请使用 --rebuild --no-cache 强制无缓存重建。"
 fi
 
 if [ "$NEED_REBUILD" = true ]; then
@@ -118,27 +128,27 @@ if [ "$NEED_REBUILD" = true ]; then
     if [ -n "$HOST_HOME" ] && [ -f "$HOST_HOME/.claude.json" ]; then
         cp "$HOST_HOME/.claude.json" "$PROJECT_ROOT/.claude.json"
     fi
-    
+
     # Get git config from host
     GIT_USER_NAME=$(git config --global --get user.name 2>/dev/null || echo "")
     GIT_USER_EMAIL=$(git config --global --get user.email 2>/dev/null || echo "")
-    
+
     # Build docker command with conditional system packages and git config
     BUILD_ARGS="--build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g)"
     if [ -n "${GIT_USER_NAME:-}" ] && [ -n "${GIT_USER_EMAIL:-}" ]; then
         BUILD_ARGS="$BUILD_ARGS --build-arg GIT_USER_NAME=\"$GIT_USER_NAME\" --build-arg GIT_USER_EMAIL=\"$GIT_USER_EMAIL\""
     fi
     if [ -n "${SYSTEM_PACKAGES:-}" ]; then
-        echo "✓ Building with additional system packages: $SYSTEM_PACKAGES"
+        log_ok "构建时附加系统软件包:$SYSTEM_PACKAGES"
         BUILD_ARGS="$BUILD_ARGS --build-arg SYSTEM_PACKAGES=\"$SYSTEM_PACKAGES\""
     fi
     if [ -n "${CC_VERSION:-}" ]; then
-        echo "✓ Building with Claude Code version: $CC_VERSION"
+        log_ok "构建 Claude Code 版本:$CC_VERSION"
         BUILD_ARGS="$BUILD_ARGS --build-arg CC_VERSION=\"$CC_VERSION\""
     fi
 
     eval "'$DOCKER' build $NO_CACHE $BUILD_ARGS -t claude-docker:latest \"$PROJECT_ROOT\""
-    
+
     # Clean up copied auth files
     rm -f "$PROJECT_ROOT/.claude.json"
 fi
@@ -149,15 +159,15 @@ mkdir -p "$SSH_DIR"
 
 # Copy authentication files to persistent claude-home if they don't exist
 if [ -n "$HOST_HOME" ] && [ -f "$HOST_HOME/.claude/.credentials.json" ] && [ ! -f "$CLAUDE_HOME_DIR/.credentials.json" ]; then
-    echo "✓ Copying Claude authentication to persistent directory"
+    log_ok "已复制 Claude 登录凭证到持久化目录"
     cp "$HOST_HOME/.claude/.credentials.json" "$CLAUDE_HOME_DIR/.credentials.json"
 fi
 
 # Log information about persistent Claude home directory
 echo ""
-echo "📁 Claude persistent home directory: $CLAUDE_HOME_DIR/"
-echo "   This directory contains Claude's settings and CLAUDE.md instructions"
-echo "   Modify files here to customize Claude's behavior across all projects"
+log_info "Claude 持久化配置目录:$CLAUDE_HOME_DIR/"
+log_info "该目录保存 Claude 设置、CLAUDE.md 指令、会话和登录凭证。"
+log_info "修改这里的文件会影响所有通过 claude-docker 启动的项目。"
 echo ""
 
 # Check SSH key setup
@@ -166,24 +176,24 @@ SSH_PUB_KEY_PATH="$SSH_DIR/id_rsa.pub"
 
 if [ ! -f "$SSH_KEY_PATH" ] || [ ! -f "$SSH_PUB_KEY_PATH" ]; then
     echo ""
-    echo "⚠️  SSH keys not found for git operations"
-    echo "   To enable git push/pull in Claude Docker:"
+    log_warn "未找到用于 Git 操作的 SSH 密钥"
+    log_warn "   如需在 Claude Docker 中启用 git push/pull:"
     echo ""
-    echo "   1. Generate SSH key:"
-    echo "      ssh-keygen -t rsa -b 4096 -f $SSH_DIR/id_rsa -N ''"
+    log_warn "   1. 生成 SSH 密钥:"
+    log_warn "      ssh-keygen -t rsa -b 4096 -f $SSH_DIR/id_rsa -N ''"
     echo ""
-    echo "   2. Add public key to GitHub:"
-    echo "      cat $SSH_DIR/id_rsa.pub"
-    echo "      # Copy output and add to: GitHub → Settings → SSH Keys"
+    log_warn "   2. 将公钥添加到 GitHub:"
+    log_warn "      cat $SSH_DIR/id_rsa.pub"
+    log_warn "      # 复制输出并添加到:GitHub → Settings → SSH Keys"
     echo ""
-    echo "   3. Test connection:"
-    echo "      ssh -T git@github.com -i $SSH_DIR/id_rsa"
+    log_warn "   3. 测试连接:"
+    log_warn "      ssh -T git@github.com -i $SSH_DIR/id_rsa"
     echo ""
-    echo "   Claude will continue without SSH keys (read-only git operations only)"
+    log_warn "   Claude 将在无 SSH 密钥的情况下继续(仅支持只读 git 操作)"
     echo ""
 else
-    echo "✓ SSH keys found for git operations"
-    
+    log_ok "已找到用于 Git 操作的 SSH 密钥"
+
     # Create SSH config if it doesn't exist
     SSH_CONFIG_PATH="$SSH_DIR/config"
     if [ ! -f "$SSH_CONFIG_PATH" ]; then
@@ -194,7 +204,7 @@ Host github.com
     IdentityFile ~/.ssh/id_rsa
     IdentitiesOnly yes
 EOF
-        echo "✓ SSH config created for GitHub"
+        log_ok "已为 GitHub 创建 SSH config"
     fi
 fi
 
@@ -205,7 +215,7 @@ DOCKER_OPTS=""
 
 # Add memory limit if specified
 if [ -n "${MEMORY_LIMIT:-}" ]; then
-    echo "✓ Setting memory limit: $MEMORY_LIMIT"
+    log_ok "设置内存上限:$MEMORY_LIMIT"
     DOCKER_OPTS="$DOCKER_OPTS --memory $MEMORY_LIMIT"
 fi
 
@@ -213,12 +223,12 @@ fi
 if [ -n "${GPU_ACCESS:-}" ]; then
     # Check if nvidia-docker2 or nvidia-container-runtime is available
     if "$DOCKER" info 2>/dev/null | grep -q nvidia || which nvidia-docker >/dev/null 2>&1; then
-        echo "✓ Enabling GPU access: $GPU_ACCESS"
+        log_ok "启用 GPU 访问:$GPU_ACCESS"
         DOCKER_OPTS="$DOCKER_OPTS --gpus $GPU_ACCESS"
     else
-        echo "⚠️  GPU access requested but NVIDIA Docker runtime not found"
-        echo "   Install nvidia-docker2 or nvidia-container-runtime to enable GPU support"
-        echo "   Continuing without GPU access..."
+        log_warn "已请求 GPU 访问,但未找到 NVIDIA Docker 运行时"
+        log_warn "   请安装 nvidia-docker2 或 nvidia-container-runtime 以启用 GPU 支持"
+        log_warn "   将在不使用 GPU 的情况下继续..."
     fi
 fi
 
@@ -227,21 +237,21 @@ DOCKER_OPTS="$DOCKER_OPTS --add-host=host.docker.internal:host-gateway"
 
 # Mount conda installation if specified
 if [ -n "${CONDA_PREFIX:-}" ] && [ -d "$CONDA_PREFIX" ]; then
-    echo "✓ Mounting conda installation from $CONDA_PREFIX"
+    log_ok "挂载 conda 安装目录:$CONDA_PREFIX"
     MOUNT_ARGS="$MOUNT_ARGS -v $CONDA_PREFIX:$CONDA_PREFIX:ro"
     ENV_ARGS="$ENV_ARGS -e CONDA_PREFIX=$CONDA_PREFIX -e CONDA_EXE=$CONDA_PREFIX/bin/conda"
 else
-    echo "No conda installation configured"
+    log_info "未配置 conda 安装目录"
 fi
 
 # Mount additional conda directories if specified
 if [ -n "${CONDA_EXTRA_DIRS:-}" ]; then
-    echo "✓ Mounting additional conda directories..."
+    log_ok "挂载额外的 conda 目录..."
     CONDA_ENVS_PATHS=""
     CONDA_PKGS_PATHS=""
     for dir in $CONDA_EXTRA_DIRS; do
         if [ -d "$dir" ]; then
-            echo "  - Mounting $dir"
+            log_info "  - 挂载 $dir"
             MOUNT_ARGS="$MOUNT_ARGS -v $dir:$dir:ro"
             # Build comma-separated list for CONDA_ENVS_DIRS
             if [[ "$dir" == *"env"* ]]; then
@@ -260,25 +270,68 @@ if [ -n "${CONDA_EXTRA_DIRS:-}" ]; then
                 fi
             fi
         else
-            echo "  - Skipping $dir (not found)"
+            log_warn "  - 跳过 $dir(不存在)"
         fi
     done
     # Set CONDA_ENVS_DIRS environment variable if we found env paths
     if [ -n "${CONDA_ENVS_PATHS:-}" ]; then
         ENV_ARGS="$ENV_ARGS -e CONDA_ENVS_DIRS=$CONDA_ENVS_PATHS"
-        echo "  - Setting CONDA_ENVS_DIRS=$CONDA_ENVS_PATHS"
+        log_info "  - 设置 CONDA_ENVS_DIRS=$CONDA_ENVS_PATHS"
     fi
     # Set CONDA_PKGS_DIRS environment variable if we found pkg paths
     if [ -n "${CONDA_PKGS_PATHS:-}" ]; then
         ENV_ARGS="$ENV_ARGS -e CONDA_PKGS_DIRS=$CONDA_PKGS_PATHS"
-        echo "  - Setting CONDA_PKGS_DIRS=$CONDA_PKGS_PATHS"
+        log_info "  - 设置 CONDA_PKGS_DIRS=$CONDA_PKGS_PATHS"
     fi
 else
-    echo "No additional conda directories configured"
+    log_info "未配置额外的 conda 目录"
+fi
+
+# Mount an additional project directory into the container at /<basename>
+# Set CLAUDE_REPO=/host/path in .env to make another project available alongside /workspace.
+if [ -n "${CLAUDE_REPO:-}" ]; then
+    if [ -d "$CLAUDE_REPO" ]; then
+        CLAUDE_REPO_NAME="$(basename "$CLAUDE_REPO")"
+        if [ "$CLAUDE_REPO_NAME" = "workspace" ]; then
+            log_warn "CLAUDE_REPO 目录名为 workspace,会与主项目挂载冲突,已跳过"
+        else
+            MOUNT_ARGS="$MOUNT_ARGS -v $CLAUDE_REPO:/$CLAUDE_REPO_NAME:rw"
+            log_ok "挂载 Claude repo:$CLAUDE_REPO -> /$CLAUDE_REPO_NAME"
+        fi
+    else
+        log_warn "CLAUDE_REPO 指定的目录不存在:$CLAUDE_REPO"
+    fi
+fi
+
+# Pass through host environment variables prefixed with ENV_ (prefix stripped inside the container).
+# Note: values containing spaces are not supported (word-split), consistent with the conda mounts above.
+ENV_PASS_COUNT=0
+while IFS='=' read -r _env_name _env_val; do
+    case "$_env_name" in
+        ENV_*)
+            _env_target="${_env_name#ENV_}"
+            [ -n "$_env_target" ] || continue
+            ENV_ARGS="$ENV_ARGS -e $_env_target=$_env_val"
+            ENV_PASS_COUNT=$((ENV_PASS_COUNT + 1))
+            ;;
+    esac
+done < <(env)
+if [ "$ENV_PASS_COUNT" -gt 0 ]; then
+    log_ok "已将 $ENV_PASS_COUNT 个 ENV_ 前缀变量传入容器环境"
+fi
+
+# Optional: host-exec SSH wrapper (container -> host). DEFAULT OFF; enable with HOST_EXEC=1.
+# SECURITY: this lets the permission-skipping agent run commands on your host via SSH.
+# It only forwards the switch + host identity; the container sets up the wrapper at startup.
+if [ -n "${HOST_EXEC:-}" ] && [ "${HOST_EXEC}" != "0" ] && [ "${HOST_EXEC}" != "false" ]; then
+    HOST_EXEC_USER="${HOST_EXEC_USER:-$(id -un)}"
+    HOST_EXEC_HOST="${HOST_EXEC_HOST:-host.docker.internal}"
+    ENV_ARGS="$ENV_ARGS -e HOST_EXEC=1 -e HOST_EXEC_USER=$HOST_EXEC_USER -e HOST_EXEC_HOST=$HOST_EXEC_HOST"
+    log_warn "已启用 HOST_EXEC:容器可经 SSH 在宿主($HOST_EXEC_USER@$HOST_EXEC_HOST)执行命令 —— 请确认已授权并限制该密钥"
 fi
 
 # Run Claude Code in Docker
-echo "Starting Claude Code in Docker..."
+log_info "正在 Docker 容器中启动 Claude Code..."
 "$DOCKER" run -it --rm \
     $DOCKER_OPTS \
     -v "$CURRENT_DIR:/workspace" \

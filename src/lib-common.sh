@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 # ABOUTME: Shared helpers for claude-docker launcher and installer scripts.
 
+# ---- Localized, leveled logging helpers ----
+# Prefixes: [成功]/[信息]/[警告]/[错误]. ANSI colors are emitted only when stdout
+# is a TTY, so piped/redirected output stays clean. The message is passed as a
+# data argument (%s), so a literal % inside a message never breaks printf.
+if [ -t 1 ]; then
+    _LOG_C_OK=$'\033[32m'
+    _LOG_C_INFO=$'\033[36m'
+    _LOG_C_WARN=$'\033[33m'
+    _LOG_C_ERR=$'\033[31m'
+    _LOG_C_RST=$'\033[0m'
+else
+    _LOG_C_OK="" ; _LOG_C_INFO="" ; _LOG_C_WARN="" ; _LOG_C_ERR="" ; _LOG_C_RST=""
+fi
+
+log_ok()   { printf '%s[成功]%s %s\n' "$_LOG_C_OK"   "$_LOG_C_RST" "$*"; }
+log_info() { printf '%s[信息]%s %s\n' "$_LOG_C_INFO" "$_LOG_C_RST" "$*"; }
+log_warn() { printf '%s[警告]%s %s\n' "$_LOG_C_WARN" "$_LOG_C_RST" "$*"; }
+log_err()  { printf '%s[错误]%s %s\n' "$_LOG_C_ERR"  "$_LOG_C_RST" "$*" >&2; }
+
 get_home_for_uid() {
     local uid="${1:-}"
     local home_dir=""

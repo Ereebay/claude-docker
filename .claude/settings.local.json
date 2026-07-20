@@ -5,7 +5,9 @@
       "Bash(find:*)",
       "Bash(env)",
       "Bash(docker run:*)",
-      "Bash(TEST_VAR=\"hello_from_host\" docker run --rm alpine sh -c 'echo \"TEST_VAR=$TEST_VAR\"')"
+      "Bash(TEST_VAR=\"hello_from_host\" docker run --rm alpine sh -c 'echo \"TEST_VAR=$TEST_VAR\"')",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit: $?\")"
     ],
     "deny": []
   }

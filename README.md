@@ -39,6 +39,40 @@ Installer notes:
 - Alias is added to your detected shell RC file (`.bashrc`, `.bash_profile`, `.zshrc`, or `.profile`)
 - Persistent data defaults to `~/.claude-docker`; override with `CLAUDE_DOCKER_HOME=/path/to/writable/dir`
 
+### Windows (PowerShell)
+
+Windows is supported natively via **Docker Desktop** and PowerShell equivalents of the shell scripts (`src/install.ps1`, `src/claude-docker.ps1`). No WSL shell required — Docker Desktop's Linux engine runs the container.
+
+**Required:** Docker Desktop (WSL2 backend recommended) + Windows PowerShell 5.1 or PowerShell 7+.
+
+```powershell
+# 1. Clone and enter directory
+git clone https://github.com/VishalJ99/claude-docker.git
+cd claude-docker
+
+# 2. Allow local scripts to run (one-time, current user only)
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+# 3. (Optional) Setup environment
+Copy-Item .env.example .env
+notepad .env
+
+# 4. Install — registers a `claude-docker` function in your PowerShell profile
+./src/install.ps1
+
+# 5. Reload profile (or open a new PowerShell window), then run from any project
+. $PROFILE
+cd ~\your-project
+claude-docker
+```
+
+Windows notes:
+- The `claude-docker` command is registered as a function in `$PROFILE` (not a shell alias).
+- Persistent data defaults to `%USERPROFILE%\.claude-docker`; override with `$env:CLAUDE_DOCKER_HOME`.
+- Host UID/GID matching is not needed — Docker Desktop virtualizes bind-mount ownership.
+- Conda passthrough (`CONDA_PREFIX` / `CONDA_EXTRA_DIRS`) is **not** supported on Windows (Windows conda binaries can't run in the Linux container); it is skipped with a warning.
+- All flags work identically: `claude-docker --rebuild`, `claude-docker --continue`, `claude-docker --memory 16g`, etc.
+
 ---
 
 ## Command Line Reference

@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     sudo \
     gettext-base \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install additional system packages if specified
@@ -61,8 +62,9 @@ ENV PATH="/usr/local/bin:${PATH}"
 # Create directories for configuration
 RUN mkdir -p /app/.claude /home/claude-user/.claude
 
-# Copy startup script
+# Copy startup script and the shared logging/helpers library it sources
 COPY src/startup.sh /app/
+COPY src/lib-common.sh /app/
 RUN chmod +x /app/startup.sh
 
 # Copy .claude directory for runtime use

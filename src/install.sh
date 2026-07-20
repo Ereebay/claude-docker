@@ -68,8 +68,8 @@ if [ -z "$TARGET_HOME" ] && [ "$EUID" -ne 0 ]; then
 fi
 
 if [ -z "$TARGET_HOME" ]; then
-    echo "Error: Could not determine a home directory for user '$TARGET_USER'."
-    echo "Set CLAUDE_DOCKER_HOME to a writable location and re-run install.sh."
+    log_err "无法为用户 '$TARGET_USER' 确定家目录。"
+    log_err "请将 CLAUDE_DOCKER_HOME 设为一个可写路径后重新运行 install.sh。"
     exit 1
 fi
 
@@ -84,30 +84,30 @@ CLAUDE_HOME_DIR="$CLAUDE_DOCKER_DIR/claude-home"
 mkdir -p "$CLAUDE_HOME_DIR"
 
 # Copy template .claude contents to persistent directory
-echo "✓ Copying template Claude configuration to persistent directory"
+log_ok "已复制模板 Claude 配置到持久化目录"
 cp -r "$PROJECT_ROOT/.claude/." "$CLAUDE_HOME_DIR/"
 
 # Copy example env file if doesn't exist
 if [ ! -f "$PROJECT_ROOT/.env" ]; then
     cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
-    echo "⚠️  Created .env file at $PROJECT_ROOT/.env"
-    echo "   Please edit it with your API keys!"
+    log_warn "已在 $PROJECT_ROOT/.env 创建 .env 文件"
+    log_warn "   请填入你的 API 密钥!"
 fi
 
 # Add alias to the detected shell RC file
 ALIAS_LINE="alias claude-docker='$PROJECT_ROOT/src/claude-docker.sh'"
 if [ ! -f "$TARGET_RC_FILE" ]; then
     touch "$TARGET_RC_FILE"
-    echo "✓ Created shell config file at $TARGET_RC_FILE"
+    log_ok "已在 $TARGET_RC_FILE 创建 shell 配置文件"
 fi
 
 if ! grep -Fq "alias claude-docker=" "$TARGET_RC_FILE"; then
     echo "" >> "$TARGET_RC_FILE"
     echo "# Claude Docker alias" >> "$TARGET_RC_FILE"
     echo "$ALIAS_LINE" >> "$TARGET_RC_FILE"
-    echo "✓ Added 'claude-docker' alias to $TARGET_RC_NAME"
+    log_ok "已将 'claude-docker' 别名添加到 $TARGET_RC_NAME"
 else
-    echo "✓ Claude-docker alias already exists in $TARGET_RC_NAME"
+    log_ok "$TARGET_RC_NAME 中已存在 claude-docker 别名"
 fi
 
 # Fix ownership when run with sudo so the invoking user can modify generated files.
@@ -125,23 +125,23 @@ chmod +x "$PROJECT_ROOT/src/startup.sh"
 
 # Check for GPU support
 echo ""
-echo "Checking GPU support..."
+log_info "正在检查 GPU 支持..."
 
 # Check if running with admin privileges
 if [ "$EUID" -eq 0 ]; then
-    echo "✓ Running with admin privileges"
-    
+    log_ok "以管理员权限运行"
+
     # Check if NVIDIA drivers are installed
     if command -v nvidia-smi &> /dev/null; then
-        echo "✓ NVIDIA drivers detected"
-        
+        log_ok "检测到 NVIDIA 驱动"
+
         # Check if Docker has GPU support
         if docker info 2>/dev/null | grep -q nvidia; then
-            echo "✓ Docker GPU support already installed"
+            log_ok "Docker GPU 支持已安装"
         else
-            echo "⚠️  Docker GPU support not found"
-            echo "Installing NVIDIA Container Toolkit..."
-            
+            log_warn "未找到 Docker GPU 支持"
+            log_info "正在安装 NVIDIA Container Toolkit..."
+
             # Install without sudo (we're already root)
             distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
             curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
@@ -153,30 +153,30 @@ if [ "$EUID" -eq 0 ]; then
             apt-get install -y -qq nvidia-container-toolkit
             nvidia-ctk runtime configure --runtime=docker > /dev/null
             systemctl restart docker
-            echo "✓ NVIDIA Container Toolkit installed"
+            log_ok "NVIDIA Container Toolkit 安装完成"
         fi
     else
-        echo "ℹ️  No NVIDIA GPU detected - skipping GPU support"
+        log_info "未检测到 NVIDIA GPU —— 跳过 GPU 支持"
     fi
 else
-    echo "ℹ️  Not running as root - skipping GPU installation"
-    echo "   To install GPU support, run: sudo $SCRIPT_DIR/install.sh"
-    
+    log_info "非 root 运行 —— 跳过 GPU 安装"
+    log_info "   如需安装 GPU 支持,请运行:sudo $SCRIPT_DIR/install.sh"
+
     # Still check status for informational purposes
     if command -v nvidia-smi &> /dev/null; then
         if docker info 2>/dev/null | grep -q nvidia; then
-            echo "   ✓ GPU support appears to be already installed"
+            log_ok "   GPU 支持似乎已安装"
         else
-            echo "   ⚠️  GPU detected but Docker GPU support not installed"
+            log_warn "   检测到 GPU,但未安装 Docker GPU 支持"
         fi
     fi
 fi
 
 echo ""
-echo "Installation complete! 🎉"
+log_ok "安装完成! 🎉"
 echo ""
-echo "Next steps:"
-echo "1. (Optional) Edit $PROJECT_ROOT/.env with your API keys"
-echo "2. Run 'source $TARGET_RC_FILE' or start a new terminal"
-echo "3. Navigate to any project and run 'claude-docker' to start"
-echo "4. If no API key, Claude will prompt for interactive authentication"
+log_info "后续步骤:"
+log_info "1.(可选)编辑 $PROJECT_ROOT/.env 填入你的 API 密钥"
+log_info "2. 运行 'source $TARGET_RC_FILE' 或新开一个终端"
+log_info "3. 进入任意项目目录并运行 'claude-docker' 启动"
+log_info "4. 若没有 API 密钥,Claude 会提示进行交互式登录认证"
