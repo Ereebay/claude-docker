@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 ABOUTME: Windows installer for claude-docker — seeds persistent config and registers a
 ABOUTME: `claude-docker` PowerShell function. Native port of src/install.sh.

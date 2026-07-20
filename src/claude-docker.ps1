@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 ABOUTME: PowerShell launcher to run Claude Code in Docker on Windows (Docker Desktop).
 ABOUTME: Native port of src/claude-docker.sh — mounting, persistent config, env passthrough.

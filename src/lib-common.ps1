@@ -1,4 +1,4 @@
-# ABOUTME: Shared helpers for the Windows (PowerShell) claude-docker launcher and installer.
+﻿# ABOUTME: Shared helpers for the Windows (PowerShell) claude-docker launcher and installer.
 # ABOUTME: Mirrors src/lib-common.sh so the Windows path behaves like the Unix scripts.
 
 # ---- Leveled logging helpers (match the Chinese prefixes used by lib-common.sh) ----
