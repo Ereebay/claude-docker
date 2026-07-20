@@ -86,6 +86,10 @@ COPY mcp-servers.txt /app/
 COPY install-mcp-servers.sh /app/
 RUN chmod +x /app/install-mcp-servers.sh
 
+# Normalize CRLF -> LF so scripts checked out on Windows (git core.autocrlf) still run under
+# Linux. Without this, the shebang becomes "#!/usr/bin/env bash\r" -> "bash\r: No such file".
+RUN sed -i 's/\r$//' /app/startup.sh /app/lib-common.sh /app/install-mcp-servers.sh /app/.env
+
 # Move auth files to proper location before switching user
 RUN cp /tmp/.claude.json /home/claude-user/.claude.json && \
     rm -f /tmp/.claude.json

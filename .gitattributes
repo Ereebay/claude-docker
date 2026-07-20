@@ -1,0 +1,12 @@
+# Container-side files MUST use LF regardless of host OS.
+# On Windows, git's default core.autocrlf=true would rewrite these to CRLF on checkout,
+# which breaks the Linux build (shebangs become "#!/usr/bin/env bash\r" -> "bash\r: not found").
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+.env            text eol=lf
+.env.example    text eol=lf
+mcp-servers.txt text eol=lf
+
+# Windows-side launcher scripts: CRLF is fine for PowerShell and conventional on Windows.
+*.ps1           text eol=crlf
