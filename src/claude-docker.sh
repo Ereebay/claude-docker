@@ -303,23 +303,6 @@ if [ -n "${CLAUDE_REPO:-}" ]; then
     fi
 fi
 
-# Pass through host environment variables prefixed with ENV_ (prefix stripped inside the container).
-# Note: values containing spaces are not supported (word-split), consistent with the conda mounts above.
-ENV_PASS_COUNT=0
-while IFS='=' read -r _env_name _env_val; do
-    case "$_env_name" in
-        ENV_*)
-            _env_target="${_env_name#ENV_}"
-            [ -n "$_env_target" ] || continue
-            ENV_ARGS="$ENV_ARGS -e $_env_target=$_env_val"
-            ENV_PASS_COUNT=$((ENV_PASS_COUNT + 1))
-            ;;
-    esac
-done < <(env)
-if [ "$ENV_PASS_COUNT" -gt 0 ]; then
-    log_ok "已将 $ENV_PASS_COUNT 个 ENV_ 前缀变量传入容器环境"
-fi
-
 # Optional: host-exec SSH wrapper (container -> host). DEFAULT OFF; enable with HOST_EXEC=1.
 # SECURITY: this lets the permission-skipping agent run commands on your host via SSH.
 # It only forwards the switch + host identity; the container sets up the wrapper at startup.

@@ -241,19 +241,6 @@ if ($env:CLAUDE_REPO) {
     }
 }
 
-# Pass through host environment variables prefixed with ENV_ (prefix stripped inside the container).
-$envPassCount = 0
-foreach ($e in (Get-ChildItem Env: | Where-Object { $_.Name -like 'ENV_*' })) {
-    $target = $e.Name.Substring(4)
-    if ($target) {
-        $envArgs += @('-e', "$target=$($e.Value)")
-        $envPassCount++
-    }
-}
-if ($envPassCount -gt 0) {
-    Write-LogOk "已将 $envPassCount 个 ENV_ 前缀变量传入容器环境"
-}
-
 # Optional: host-exec SSH wrapper (container -> host). DEFAULT OFF; enable with HOST_EXEC=1.
 if ($env:HOST_EXEC -and $env:HOST_EXEC -ne '0' -and $env:HOST_EXEC -ne 'false') {
     $hostExecUser = if ($env:HOST_EXEC_USER) { $env:HOST_EXEC_USER } else { $env:USERNAME }
