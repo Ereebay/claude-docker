@@ -35,7 +35,9 @@ if (-not (Test-Path -LiteralPath $EnvFile)) {
 
 # ---- Register a `claude-docker` function in the user's PowerShell profile ----
 $LauncherPath = Join-Path $ScriptDir 'claude-docker.ps1'
-$ProfilePath  = $PROFILE.CurrentUserAllHosts
+# Use the default $PROFILE (CurrentUserCurrentHost) — this is what `. $PROFILE` reloads
+# and what auto-loads in the console, so the `claude-docker` command lands where users expect it.
+$ProfilePath  = $PROFILE.CurrentUserCurrentHost
 $ProfileDir   = Split-Path -Parent $ProfilePath
 if (-not (Test-Path -LiteralPath $ProfileDir)) {
     New-Item -ItemType Directory -Path $ProfileDir -Force | Out-Null
@@ -53,9 +55,9 @@ if ($profileContent -notmatch 'function\s+claude-docker') {
 function claude-docker { & "$LauncherPath" @args }
 "@
     Add-Content -LiteralPath $ProfilePath -Value $block
-    Write-LogOk "已将 'claude-docker' 函数添加到 PowerShell 配置文件"
+    Write-LogOk "已将 'claude-docker' 函数添加到 PowerShell 配置文件:$ProfilePath"
 } else {
-    Write-LogOk "PowerShell 配置文件中已存在 claude-docker 函数"
+    Write-LogOk "PowerShell 配置文件中已存在 claude-docker 函数:$ProfilePath"
 }
 
 # ---- GPU support (informational on Windows) ----
